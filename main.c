@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #define LISTEN_BACKLOG 50
 
@@ -40,7 +41,7 @@ int main(int argc, char *argv[]) {
   // Initialize IP socket address (IP interface address + 16-bit port number)
   struct sockaddr_in sock_addr;
   sock_addr.sin_family = AF_INET;
-  sock_addr.sin_port = htons(8080);
+  sock_addr.sin_port = htons(8081);
   sock_addr.sin_addr = addr;
 
   // Assigning name to address i.e. binding
@@ -51,17 +52,44 @@ int main(int argc, char *argv[]) {
   }
 
   // Listen on socket address
-  int listening = listen(sockfd, LISTEN_BACKLOG);
-  if (listening == -1) {
+  int listened = listen(sockfd, LISTEN_BACKLOG);
+  if (listened == -1) {
     err(EXIT_FAILURE, "listen failed");
   }
 
-  struct sockaddr peer_sock_addr;
-  int peer_sock_len = sizeof(sock_addr);
-  int accepted_sockfd =
-      accept(sockfd, &peer_sock_addr, (socklen_t *)&peer_sock_len);
-  if (accepted_sockfd == -1) {
-    err(EXIT_FAILURE, "accept failed");
+  while (1) {
+    struct sockaddr peer_sock_addr;
+    int peer_sock_len = sizeof(sock_addr);
+    int accepted_sockfd =
+        accept(sockfd, &peer_sock_addr, (socklen_t *)&peer_sock_len);
+    if (accepted_sockfd == -1) {
+      err(EXIT_FAILURE, "accept failed");
+    }
+
+    char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
+    int sent = write(accepted_sockfd, message, strlen(message));
+    if (sent == -1) {
+      err(EXIT_FAILURE, "send failed");
+    }
+
+    int shutdown_accepted = shutdown(accepted_sockfd, SHUT_RDWR);
+    if (shutdown_accepted == -1) {
+      err(EXIT_FAILURE, "shutdown failed");
+    }
+    int closed_accepted = close(accepted_sockfd);
+    if (closed_accepted == -1) {
+      err(EXIT_FAILURE, "close failed");
+    }
+  }
+
+  int shutdown_listening = shutdown(sockfd, SHUT_RDWR);
+  if (shutdown_listening == -1) {
+    err(EXIT_FAILURE, "shutdown failed");
+  }
+
+  int closed_listening = close(sockfd);
+  if (closed_listening == -1) {
+    err(EXIT_FAILURE, "close failed");
   }
 
   return 0;
