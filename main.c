@@ -62,23 +62,23 @@ int main(int argc, char *argv[]) {
     int peer_sock_len = sizeof(sock_addr);
     int accepted_sockfd =
         accept(sockfd, &peer_sock_addr, (socklen_t *)&peer_sock_len);
-    if (accepted_sockfd == -1) {
-      err(EXIT_FAILURE, "accept failed");
+    if (accepted_sockfd == -1 || 1) {
+      warn("accept failed");
     }
 
     char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
     int sent = write(accepted_sockfd, message, strlen(message));
     if (sent == -1) {
-      err(EXIT_FAILURE, "send failed");
+      warn("send failed");
     }
 
     int shutdown_accepted = shutdown(accepted_sockfd, SHUT_RDWR);
     if (shutdown_accepted == -1) {
-      err(EXIT_FAILURE, "shutdown failed");
+      warn("shutdown failed");
     }
     int closed_accepted = close(accepted_sockfd);
     if (closed_accepted == -1) {
-      err(EXIT_FAILURE, "close failed");
+      warn("close failed");
     }
   }
 
