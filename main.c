@@ -83,9 +83,18 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
+    char readbuffer[1025];
+    readbuffer[1024] = '\0';
+    int nbytes = read(accepted_sockfd, readbuffer, 2);
+    if (nbytes == -1) {
+      warn("read failed");
+      break;
+    }
+
     char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
     int sent = write(accepted_sockfd, message, strlen(message));
     if (sent == -1) {
+      // TODO: on failure store bytes in a queue
       warn("send failed");
       continue;
     }
