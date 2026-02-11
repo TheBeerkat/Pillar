@@ -85,10 +85,10 @@ int main(int argc, char *argv[]) {
 
     char readbuffer[1025];
     readbuffer[1024] = '\0';
-    int nbytes = read(accepted_sockfd, readbuffer, 2);
+    int nbytes = read(accepted_sockfd, readbuffer, 1024);
     if (nbytes == -1) {
       warn("read failed");
-      break;
+      continue;
     }
 
     char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
