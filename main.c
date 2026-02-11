@@ -20,6 +20,27 @@ int verify_addr(char *addr) {
   return 0;
 }
 
+#define ERROR 0
+#define WARNING 1
+
+void cleanup_socket(int sockfd, int type) {
+  int down = shutdown(sockfd, SHUT_RDWR);
+  if (down == -1) {
+    if (type == 0)
+      err(EXIT_FAILURE, "shutdown failed");
+    else
+      warn("shutdown failed");
+  }
+
+  int closed = close(sockfd);
+  if (closed == -1) {
+    if (type == 0)
+      err(EXIT_FAILURE, "close failed");
+    else
+      warn("close failed");
+  }
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     fprintf(stderr, "Must specify IP interface address.\n");
@@ -80,6 +101,7 @@ int main(int argc, char *argv[]) {
         accept(sockfd, &peer_sock_addr, (socklen_t *)&peer_sock_len);
     if (accepted_sockfd == -1) {
       warn("accept failed");
+      cleanup_socket(accepted_sockfd, WARNING);
       continue;
     }
 
@@ -88,6 +110,7 @@ int main(int argc, char *argv[]) {
     int nbytes = read(accepted_sockfd, readbuffer, 1024);
     if (nbytes == -1) {
       warn("read failed");
+      cleanup_socket(accepted_sockfd, WARNING);
       continue;
     }
 
@@ -96,31 +119,15 @@ int main(int argc, char *argv[]) {
     if (sent == -1) {
       // TODO: on failure store bytes in a queue
       warn("send failed");
+      cleanup_socket(accepted_sockfd, WARNING);
       continue;
     }
 
     // Cleanup
-    int shutdown_accepted = shutdown(accepted_sockfd, SHUT_RDWR);
-    if (shutdown_accepted == -1) {
-      warn("shutdown failed");
-      continue;
-    }
-    int closed_accepted = close(accepted_sockfd);
-    if (closed_accepted == -1) {
-      warn("close failed");
-      continue;
-    }
+    cleanup_socket(accepted_sockfd, WARNING);
   }
 
-  int shutdown_listening = shutdown(sockfd, SHUT_RDWR);
-  if (shutdown_listening == -1) {
-    err(EXIT_FAILURE, "shutdown failed");
-  }
-
-  int closed_listening = close(sockfd);
-  if (closed_listening == -1) {
-    err(EXIT_FAILURE, "close failed");
-  }
+  cleanup_socket(sockfd, ERROR);
 
   return 0;
 }
