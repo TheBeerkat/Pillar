@@ -5,4 +5,6 @@ compile: main.c clean
 	gcc main.c -o main
 
 clean:
+ifneq (, $(wildcard ./main))
 	rm main
+endif

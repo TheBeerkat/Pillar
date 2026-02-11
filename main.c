@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <asm-generic/socket.h>
 #include <err.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
