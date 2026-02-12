@@ -51,6 +51,7 @@ void *handle_client(void *sfd) {
   if (nbytes == -1) {
     warn("read failed");
     cleanup_socket(*sockfd, WARNING);
+    free(sfd);
     return NULL;
   }
 
@@ -67,6 +68,7 @@ void *handle_client(void *sfd) {
   // Cleanup
   cleanup_socket(*sockfd, WARNING);
   pthread_detach(pthread_self());
+  free(sfd);
   return NULL;
 }
 
@@ -135,7 +137,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread_id;
     int *accepted_sockfd_ptr = malloc(sizeof(int));
-    accepted_sockfd_ptr = &accepted_sockfd;
+    *accepted_sockfd_ptr = accepted_sockfd;
     int created =
         pthread_create(&thread_id, NULL, &handle_client, accepted_sockfd_ptr);
   }
