@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
+#include <bits/pthreadtypes.h>
 #include <err.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +14,8 @@
 #define LISTEN_BACKLOG 50
 #define SOCKET_TIMEOUT_SECONDS 5
 #define SOCKET_TIMEOUT_MICROSECONDS 0
+#define ERROR 0
+#define WARNING 1
 
 int verify_addr(char *addr) {
   // TODO: verify address with regex
@@ -19,9 +23,6 @@ int verify_addr(char *addr) {
     return 1;
   return 0;
 }
-
-#define ERROR 0
-#define WARNING 1
 
 void cleanup_socket(int sockfd, int type) {
   int down = shutdown(sockfd, SHUT_RDWR);
@@ -39,6 +40,36 @@ void cleanup_socket(int sockfd, int type) {
     else
       warn("close failed");
   }
+}
+
+void *handle_client(void *sfd) {
+  char readbuffer[1025];
+  readbuffer[1024] = '\0';
+  int *sockfd = sfd;
+
+  int nbytes = read(*sockfd, readbuffer, 1024);
+  if (nbytes == -1) {
+    warn("read failed");
+    cleanup_socket(*sockfd, WARNING);
+    return NULL;
+  }
+  fprintf(stdout, readbuffer);
+  while (1) {
+  }
+
+  char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
+  int sent = write(*sockfd, message, strlen(message));
+  if (sent == -1) {
+    // TODO: on failure store bytes in a queue
+    warn("send failed");
+    cleanup_socket(*sockfd, WARNING);
+    return NULL;
+  }
+
+  // Cleanup
+  cleanup_socket(*sockfd, WARNING);
+  pthread_detach(pthread_self());
+  return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -101,30 +132,12 @@ int main(int argc, char *argv[]) {
         accept(sockfd, &peer_sock_addr, (socklen_t *)&peer_sock_len);
     if (accepted_sockfd == -1) {
       warn("accept failed");
-      cleanup_socket(accepted_sockfd, WARNING);
       continue;
     }
 
-    char readbuffer[1025];
-    readbuffer[1024] = '\0';
-    int nbytes = read(accepted_sockfd, readbuffer, 1024);
-    if (nbytes == -1) {
-      warn("read failed");
-      cleanup_socket(accepted_sockfd, WARNING);
-      continue;
-    }
-
-    char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
-    int sent = write(accepted_sockfd, message, strlen(message));
-    if (sent == -1) {
-      // TODO: on failure store bytes in a queue
-      warn("send failed");
-      cleanup_socket(accepted_sockfd, WARNING);
-      continue;
-    }
-
-    // Cleanup
-    cleanup_socket(accepted_sockfd, WARNING);
+    pthread_t thread_id;
+    int created =
+        pthread_create(&thread_id, NULL, &handle_client, &accepted_sockfd);
   }
 
   cleanup_socket(sockfd, ERROR);
