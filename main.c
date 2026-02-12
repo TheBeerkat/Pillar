@@ -53,9 +53,6 @@ void *handle_client(void *sfd) {
     cleanup_socket(*sockfd, WARNING);
     return NULL;
   }
-  fprintf(stdout, readbuffer);
-  while (1) {
-  }
 
   char *message = "HTTP/1.1 200 OK\r\n\r\nPillar Online\n";
   int sent = write(*sockfd, message, strlen(message));
@@ -63,6 +60,7 @@ void *handle_client(void *sfd) {
     // TODO: on failure store bytes in a queue
     warn("send failed");
     cleanup_socket(*sockfd, WARNING);
+    free(sfd);
     return NULL;
   }
 
@@ -136,8 +134,10 @@ int main(int argc, char *argv[]) {
     }
 
     pthread_t thread_id;
+    int *accepted_sockfd_ptr = malloc(sizeof(int));
+    accepted_sockfd_ptr = &accepted_sockfd;
     int created =
-        pthread_create(&thread_id, NULL, &handle_client, &accepted_sockfd);
+        pthread_create(&thread_id, NULL, &handle_client, accepted_sockfd_ptr);
   }
 
   cleanup_socket(sockfd, ERROR);
