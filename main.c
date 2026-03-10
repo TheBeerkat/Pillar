@@ -1,9 +1,11 @@
 #include <arpa/inet.h>
-#include <bits/pthreadtypes.h>
 #include <err.h>
+#include <math.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +14,7 @@
 #include <unistd.h>
 
 #define LISTEN_BACKLOG 50
-#define SOCKET_TIMEOUT_SECONDS 5
+#define SOCKET_TIMEOUT_SECONDS 10
 #define SOCKET_TIMEOUT_MICROSECONDS 0
 #define ERROR 0
 #define WARNING 1
@@ -67,20 +69,63 @@ void *handle_client(void *sfd) {
 
   // Cleanup
   cleanup_socket(*sockfd, WARNING);
-  pthread_detach(pthread_self());
   free(sfd);
+  pthread_detach(pthread_self());
   return NULL;
 }
 
+void register_service(char *port) {
+  int sockfd;
+  int connected = -1;
+  struct addrinfo *result;
+
+  int info = getaddrinfo("keystone", port, NULL, &result);
+  if (info != 0) {
+    warn("getaddrinfo failed");
+    return;
+  }
+
+  for (int i = 0; i < 5 && connected == -1; i++) {
+    sockfd =
+        socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (sockfd == -1) {
+      warn("register socket failed");
+      freeaddrinfo(result);
+      return;
+    }
+
+    connected = connect(sockfd, result->ai_addr, result->ai_addrlen);
+    if (connected == -1) {
+      warn("connect to keystone failed retrying");
+      cleanup_socket(sockfd, WARNING);
+    }
+    sleep(pow(2, i));
+  }
+  if (connected == -1) {
+    warn("connect to keystone failed completely");
+    cleanup_socket(sockfd, WARNING);
+    freeaddrinfo(result);
+    return;
+  }
+
+  fprintf(stderr, "Service registration complete\n");
+  cleanup_socket(sockfd, WARNING);
+  freeaddrinfo(result);
+}
+
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    fprintf(stderr, "Must specify IP interface address.\n");
+  if (argc < 4) {
+    fprintf(
+        stderr,
+        "Must specify IP interface address, Pillar port, Keystone IPC port.\n");
     return -1;
   }
   if (verify_addr(argv[1])) {
     fprintf(stderr, "IP interface address verification failed\n");
     return -1;
   }
+
+  register_service(argv[3]);
 
   // Initialize socket
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -140,6 +185,10 @@ int main(int argc, char *argv[]) {
     *accepted_sockfd_ptr = accepted_sockfd;
     int created =
         pthread_create(&thread_id, NULL, &handle_client, accepted_sockfd_ptr);
+    if (created == -1) {
+      warn("pthread_create failed");
+      continue;
+    }
   }
 
   cleanup_socket(sockfd, ERROR);
